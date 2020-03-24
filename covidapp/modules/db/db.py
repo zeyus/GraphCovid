@@ -58,7 +58,7 @@ class Database:
          dltconfirmed INT,
          dltdeaths    INT,
          dltrecovered INT,
-         day          CHAR(50)
+         day          CHAR(10)                 NOT NULL
          );'''.format(self.case_table))
 
 
@@ -77,7 +77,7 @@ class Database:
         self.exec('CREATE INDEX idx_date ON {}(updated)'.format(self.case_table))
         self.exec('CREATE INDEX idx_day ON {}(day)'.format(self.case_table))
         self.exec('CREATE INDEX idx_country_day ON {}(country,day)'.format(self.case_table))
-        self.exec('CREATE UNIQUE INDEX idx_dcp ON {}(updated,country,province)'.format(self.case_table))
+        self.exec('CREATE UNIQUE INDEX idx_dcp ON {}(day,country,province)'.format(self.case_table))
     def calculate_delta(self):
         result = self.exec('SELECT DISTINCT country FROM {}'.format(self.case_table))
         countries = result.fetchall()
@@ -89,23 +89,22 @@ class Database:
                 prev_deaths = 0
                 prev_recovered = 0
                 query_parameters = []
-                data = self.exec('SELECT * FROM {} WHERE province = ? AND country = ? ORDER BY updated ASC'.format(self.case_table), [province[0], country[0]], False)
+                data = self.exec('SELECT * FROM {} WHERE province = ? AND country = ? ORDER BY day ASC'.format(self.case_table), [province[0], country[0]], False)
                 for entry in data:
                     parameters = (
                         entry[self.row_map['confirmed']] - prev_confirmed,
                         entry[self.row_map['deaths']] - prev_deaths,
                         entry[self.row_map['recovered']] - prev_recovered,
-                        entry[self.row_map['updated']],
+                        entry[self.row_map['day']],
                         entry[self.row_map['country']],
                         entry[self.row_map['province']]
                         )
                     prev_confirmed = entry[self.row_map['confirmed']]
-                    prev_confirmed = entry[self.row_map['deaths']]
+                    prev_deaths = entry[self.row_map['deaths']]
                     prev_recovered = entry[self.row_map['recovered']]
-
                     query_parameters.append(parameters)
-                self.exec('UPDATE {} SET dltconfirmed = ?, dltdeaths = ?, dltrecovered = ? WHERE updated = ? AND country = ? AND province = ?'.format(self.case_table), query_parameters)
-                print('Updated country "{}", province "{}"'.format(country[0], province[0]))
+                self.exec('UPDATE {} SET dltconfirmed = ?, dltdeaths = ?, dltrecovered = ? WHERE day = ? AND country = ? AND province = ?'.format(self.case_table), query_parameters)
+            print('Updated country "{}"'.format(country[0], province[0]))
     def verify_schema(self):
         result = self.exec('SELECT count(*) > 0 FROM sqlite_master where tbl_name = ? and type="table"', [self.case_table], False)
         table_found = result.fetchone()
@@ -115,6 +114,7 @@ class Database:
             return False
     def create_country_table(self):
         self.exec('CREATE TABLE {} AS SELECT country, day, SUM(confirmed) AS confirmed, SUM(deaths) as deaths, SUM(recovered) AS recovered, SUM(dltconfirmed) AS dltconfirmed, SUM(dltdeaths) AS dltdeaths, SUM(dltrecovered) AS dltrecovered FROM {} GROUP BY country,day'.format(self.country_table, self.case_table))
+        print('Created country aggregate table')
     def exec(self, query, parameters=None, multi_query=True):
         if not self.conn:
             raise Exception('No database connection')
