@@ -30,12 +30,16 @@ class Importer:
                         continue
                     # whhyyyyyyyy different formats
                     if col_count == 6 or col_count == 8:
-                        data.append((row[0].strip(), row[1].strip(), self.transform_date(row[2]), self.transform_number(row[3]), self.transform_number(row[4]), self.transform_number(row[5])))
+                        data.append((row[0].strip(), row[1].strip(), self.transform_date(row[2]), self.transform_number(row[3]), self.transform_number(row[4]), self.transform_number(row[5]), self.transform_date(row[2], False)))
                     elif col_count == 12:
-                        data.append((row[2].strip(), row[3].strip(), self.transform_date(row[4]), self.transform_number(row[7]), self.transform_number(row[8]), self.transform_number(row[9])))
+                        data.append((row[2].strip(), row[3].strip(), self.transform_date(row[4]), self.transform_number(row[7]), self.transform_number(row[8]), self.transform_number(row[9]),  self.transform_date(row[4], False)))
         return data
-    def transform_date(self, date):
-        return dateutil.parser.parse(date, default=self.default_date, dayfirst=False).timestamp()
+    def transform_date(self, date, timestamp=True):
+        date_obj = dateutil.parser.parse(date, default=self.default_date, dayfirst=False)
+        if timestamp:
+            return date_obj.timestamp()
+        else:
+            return date_obj.strftime('%Y-%m-%d')
     def transform_number(self, number):
         if number == '':
             number = 0

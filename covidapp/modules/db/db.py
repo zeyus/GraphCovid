@@ -5,6 +5,7 @@ class Database:
     db_file = False
     conn = False
     case_table = 'covid_cases'
+    country_table = 'cases_by_country'
     importer = None
     row_map = {
         'province':     0,
@@ -15,7 +16,8 @@ class Database:
         'recovered':    5,
         'dltconfirmed': 6,
         'dltdeaths':    7,
-        'dltrecovered': 8
+        'dltrecovered': 8,
+        'day':          9
     }
 
     def __init__(self, db_file):
@@ -45,6 +47,7 @@ class Database:
 
     def prepare_schema(self):
         self.exec('DROP TABLE IF EXISTS {}'.format(self.case_table))
+        self.exec('DROP TABLE IF EXISTS {}'.format(self.country_table))
         self.exec('''CREATE TABLE {}
          (province     CHAR(50),
          country      CHAR(50)                 NOT NULL,
@@ -54,7 +57,8 @@ class Database:
          recovered    INT                      NOT NULL,
          dltconfirmed INT,
          dltdeaths    INT,
-         dltrecovered INT
+         dltrecovered INT,
+         day          CHAR(50)
          );'''.format(self.case_table))
 
 
@@ -64,12 +68,15 @@ class Database:
     
     def load_data(self, importer):
         data = importer.import_from_csv()
-        self.exec('INSERT INTO {} VALUES (?,?,?,?,?,?,0,0,0) ON CONFLICT DO NOTHING'.format(self.case_table), data)
+        self.exec('INSERT INTO {} VALUES (?,?,?,?,?,?,0,0,0,?) ON CONFLICT DO NOTHING'.format(self.case_table), data)
         self.calculate_delta()
+        self.create_country_table()
     def create_indices(self):
         self.exec('CREATE INDEX idx_country_name ON {}(country)'.format(self.case_table))
         self.exec('CREATE INDEX idx_province_name ON {}(province)'.format(self.case_table))
         self.exec('CREATE INDEX idx_date ON {}(updated)'.format(self.case_table))
+        self.exec('CREATE INDEX idx_day ON {}(day)'.format(self.case_table))
+        self.exec('CREATE INDEX idx_country_day ON {}(country,day)'.format(self.case_table))
         self.exec('CREATE UNIQUE INDEX idx_dcp ON {}(updated,country,province)'.format(self.case_table))
     def calculate_delta(self):
         result = self.exec('SELECT DISTINCT country FROM {}'.format(self.case_table))
@@ -106,6 +113,8 @@ class Database:
             return True
         else:
             return False
+    def create_country_table(self):
+        self.exec('CREATE TABLE {} AS SELECT country, day, SUM(confirmed) AS confirmed, SUM(deaths) as deaths, SUM(recovered) AS recovered, SUM(dltconfirmed) AS dltconfirmed, SUM(dltdeaths) AS dltdeaths, SUM(dltrecovered) AS dltrecovered FROM {} GROUP BY country,day'.format(self.country_table, self.case_table))
     def exec(self, query, parameters=None, multi_query=True):
         if not self.conn:
             raise Exception('No database connection')
