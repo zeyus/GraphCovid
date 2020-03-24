@@ -22,8 +22,7 @@ class Importer:
             header_skipped = False
             col_count = None
             file_name = os.path.basename(csv_file)
-            file_date = file_name[6:10] + '-' + file_name[3:5] + '-' + file_name[0:2]
-            print(file_date)
+            file_date = file_name[6:10] + '-' + file_name[0:2] + '-' + file_name[3:5]
             with open(csv_file, 'r') as f:
                 covid_data_reader = csv.reader(f)
                 for row in covid_data_reader:
